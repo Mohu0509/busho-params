@@ -33,9 +33,20 @@ jobs:
 
       - name: Build Angular app
         run: |
-          npx ng build --configuration=production --base-href "/bari-bari-data/"
+          REPO_NAME="${{ github.event.repository.name }}"
+          if [[ "$REPO_NAME" == *.github.io ]]; then
+            BASE="/"
+          else
+            BASE="/$REPO_NAME/"
+          fi
+          echo "Using base-href: $BASE"
+          npx ng build --configuration=production --base-href "$BASE" --deploy-url "$BASE"
           # SPA ルーティング対応（リロード 404 回避）
           cp dist/bari-bari-data/browser/index.html dist/bari-bari-data/browser/404.html
+          # GitHub Pages の Jekyll 無効化（念のため）
+          touch dist/bari-bari-data/browser/.nojekyll
+          # 出力物の一覧をログに出す（デバッグ用）
+          ls -la dist/bari-bari-data/browser
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
