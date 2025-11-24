@@ -4,13 +4,14 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef, GridReadyEvent } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GetRowIdParams } from 'ag-grid-community';
 import { CsvDataRepository } from '@repos/csv-data.repository';
 import { ComputeService } from '@services/compute.service';
 import { AppConfigService } from '@core/app-config.service';
 import { General, UnitState } from '@models/general.model';
 import { Weapon } from '@models/weapon.model';
 import { Rules } from '@models/rules.model';
+import { HaveBooleanFilterComponent } from './have-boolean-filter.component';
 
 type RosterRow = General & UnitState & {
   equipName?: string;
@@ -21,7 +22,7 @@ type RosterRow = General & UnitState & {
 @Component({
   selector: 'app-roster',
   standalone: true,
-  imports: [CommonModule, AgGridAngular],
+  imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent],
   template: `
     <!-- 読み込み状態や件数、エラーを表示する簡易ヘッダー -->
     <div style="margin-bottom: 8px;">
@@ -36,6 +37,8 @@ type RosterRow = General & UnitState & {
       [columnDefs]="columnDefs"
       [defaultColDef]="defaultColDef"
       [localeText]="localeJA"
+      [getRowId]="getRowId"
+      [suppressScrollOnNewData]="true"
       (gridReady)="onGridReady($event)"
       (cellValueChanged)="onCellValueChanged($event)"
     />
@@ -44,29 +47,38 @@ type RosterRow = General & UnitState & {
 export class RosterComponent implements OnInit {
   // 画面に表示する行データ（signal でリアクティブに更新）
   rows = signal<RosterRow[]>([]);
+  // 行IDを固定（スクロールや選択状態を安定化）
+  getRowId = (p: GetRowIdParams<RosterRow>) => String(p.data?.no ?? '');
   weapons: Weapon[] = [];
   rules!: Rules;
   // 進捗やエラー表示用の状態
   loading = signal<boolean>(true);
   error = signal<string | null>(null);
+  // （外部フィルタは撤去。AG Grid内蔵フィルタに一本化）
 
   // 全列に共通の設定（サイズ変更・ソート・フィルタなど）
   defaultColDef: ColDef<RosterRow> = {
     resizable: true,
     sortable: true,
     filter: true,
+    // フローティングフィルタは無効化（ヘッダーとメニューを1行に）
+    floatingFilter: false,
     cellClass: (p) => (p.colDef.editable ? 'cell-editable' : 'cell-label'),
   };
 
-  // 列ごとの表示/編集ルールを定義
+  // 列ごとの表示/編集ルールを定義（assets/docs/項目定義.md のフィルタ/ソート要否に準拠）
   columnDefs: ColDef<RosterRow>[] = [
-    { field: 'no', headerName: 'No', width: 70, pinned: 'left', cellClass: 'ag-right-aligned-cell' },
+    // no: フィルタ× / ソート○
+    { field: 'no', headerName: 'No', width: 70, pinned: 'left', cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     {
       field: 'camp',
       headerName: '陣営',
       width: 90,
       pinned: 'left',
-      filter: 'agSetColumnFilter',
+      // camp: フィルタ（テキスト: equals）/ ソート×
+      filter: 'agTextColumnFilter',
+      filterParams: { filterOptions: ['equals'] },
+      sortable: false,
       cellRenderer: (p: any) => campBadge(p.value),
       cellClass: 'ag-center-aligned-cell cell-label',
     },
@@ -74,13 +86,16 @@ export class RosterComponent implements OnInit {
       headerName: '名将',
       width: 80,
       editable: false,
-      valueGetter: (p) => (p.data?.meisho ? '○' : ''),
+      valueGetter: (p) => (p.data?.meisho ? '○' : '×'), // フィルタ選択を明確に
       pinned: 'left',
       cellRenderer: (p: any) => (p.value === '○' ? `<span class="badge badge-meisho">名将</span>` : ''),
       cellClass: 'ag-center-aligned-cell cell-label',
+      // meisho: フィルタ（テキスト: equals）/ ソート×
       filter: false,
+      sortable: false,
     },
-    { field: 'name', headerName: '武将名', width: 160, pinned: 'left' },
+    // name: フィルタ× / ソート×
+    { field: 'name', headerName: '武将名', width: 100, pinned: 'left', filter: false, sortable: false },
     {
       field: 'have',
       headerName: '所持',
@@ -89,6 +104,9 @@ export class RosterComponent implements OnInit {
       cellDataType: 'boolean',
       cellRenderer: (p: any) => this.haveCellRenderer(p),
       cellClass: 'ag-center-aligned-cell cell-editable have-cell',
+      // have: カスタム（Community）フィルタ（ON/OFF を選択）
+      filter: HaveBooleanFilterComponent,
+      sortable: false,
     },
     {
       field: 'toku',
@@ -99,6 +117,10 @@ export class RosterComponent implements OnInit {
       cellEditorParams: { values: [0, 1, 2, 3, 4, 5] },
       valueFormatter: (p) => `${p.value}`,
       cellClass: 'ag-right-aligned-cell cell-editable',
+      // toku: フィルタ（数値: equals）/ ソート○
+      filter: 'agNumberColumnFilter',
+      filterParams: { filterOptions: ['equals'] },
+      sortable: true,
     },
     {
       field: 'level',
@@ -108,20 +130,32 @@ export class RosterComponent implements OnInit {
       cellEditor: 'agNumberCellEditor',
       valueFormatter: (p) => `${p.value}`,
       cellClass: 'ag-right-aligned-cell cell-editable',
+      // level: フィルタ× / ソート○
+      filter: false,
+      sortable: true,
     },
-    { field: 'equipName', headerName: '装備', width: 160 },
-    { field: 'strInit', headerName: '武(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'intInit', headerName: '知(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'vitInit', headerName: '耐(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'hpInit', headerName: '体(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'strBase', headerName: '武(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'intBase', headerName: '知(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'vitBase', headerName: '耐(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'hpBase', headerName: '体(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
-    { field: 'strFinal', headerName: '武(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
-    { field: 'intFinal', headerName: '知(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
-    { field: 'vitFinal', headerName: '耐(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
-    { field: 'hpFinal', headerName: '体(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
+    // equip: フィルタ× / ソート×
+    { field: 'equipName', headerName: '装備', width: 160, filter: false, sortable: false },
+    // *_init: フィルタ× / ソート○
+    { field: 'strInit', headerName: '武(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'intInit', headerName: '知(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'vitInit', headerName: '耐(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'hpInit', headerName: '体(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    // *_base: フィルタ× / ソート○
+    { field: 'strBase', headerName: '武(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'intBase', headerName: '知(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'vitBase', headerName: '耐(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'hpBase', headerName: '体(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    // *_final: フィルタ× / ソート○
+    { field: 'strFinal', headerName: '武(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'intFinal', headerName: '知(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'vitFinal', headerName: '耐(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'hpFinal', headerName: '体(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    // state_*: フィルタ（テキスト: equals）/ ソート○
+    { field: 'stateAngry', headerName: '怒', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    { field: 'stateNormal', headerName: '普', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    { field: 'stateFollowPre', headerName: '追元', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    { field: 'stateFollowPost', headerName: '追後', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
   ];
 
   constructor(
@@ -190,7 +224,10 @@ export class RosterComponent implements OnInit {
     row.toku = clampInt(row.toku, this.rules.limits.toku.min, this.rules.limits.toku.max, this.rules.defaults.toku);
     row.have = !!row.have;
     this.recalculate(row);
-    this.rows.set([...this.rows()]);
+    // 配列を差し替えず、該当セルのみ再描画してスクロール/選択を保持
+    if (event?.api && event?.node) {
+      event.api.refreshCells({ rowNodes: [event.node], force: true });
+    }
   }
 
   // 武将データから表示用の 1 行を組み立てる
@@ -224,6 +261,7 @@ export class RosterComponent implements OnInit {
     return byOwner?.id ?? null;
   }
 
+  // 外部フィルタは撤去（AG Grid 内蔵フィルタを使用）
   // カスタムチェックボックス（所持）
   private haveCellRenderer = (p: any): HTMLElement => {
     const btn = document.createElement('button');
