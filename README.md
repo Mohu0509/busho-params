@@ -83,3 +83,19 @@ npm install
 npm run start
 # ブラウザで http://localhost:4200 を開く
 ```
+
+## 開発ルール（AG Grid の前提）
+
+- 本リポジトリは AG Grid の無償（Community）版を前提とします。
+  - 依存関係: `ag-grid-angular`, `ag-grid-community`（`ag-grid-enterprise` は含めません）
+  - 起動時の登録: `AllCommunityModule` のみを登録します。
+- フィルタ機能の方針
+  - Community 版で利用可能なフィルタを使用します（`agTextColumnFilter`, `agNumberColumnFilter` など）。
+  - 「候補リストから選択する」Set Filter は Enterprise 機能のため使用しません。
+  - 完全一致が必要な場合は `filterOptions: ['equals']` を設定します。
+- Enterprise 機能（例: Set Filter、ツールパネル等）を使う要件が出た場合の対応
+  1) 事前に合意を取り、依存に `ag-grid-enterprise` を追加
+  2) `SetFilterModule` 等の必要モジュールを `ModuleRegistry.registerModules([...])` に登録
+  3) 対象列の `filter: 'agSetColumnFilter'` への切替を実施
+
+この方針により、無償版の範囲で安定して動作させ、必要になった時点でのみ有償機能へ拡張します。

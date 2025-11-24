@@ -182,33 +182,61 @@
   }
 </style>
 
-<!-- 画面上部のヘッダー（アプリ名・説明） -->
-<header class="bg-brand-600 text-white shadow">
-  <div class="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between">
-    <h1 class="text-xl font-semibold tracking-wide">武将パラメータ計算</h1>
-    <span class="text-sm opacity-90">Angular + AG Grid</span>
+<!-- 画面上部のヘッダー（極力コンパクト、ロゴのみ表示） -->
+<header class="bg-sango-50 border-b border-sango-200">
+  <div class="max-w-screen-xl mx-auto px-3 py-1.5 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <img src="assets/logo-sango.svg" alt="" class="h-5 w-5 rounded-sm" />
+      <span class="sr-only">武将パラメータ計算</span>
+    </div>
   </div>
 </header>
 
-<!-- メインコンテンツのラッパー -->
-<div class="max-w-screen-xl mx-auto p-4 space-y-8">
-  <!-- 武将の一覧とパラメータ表（AG Grid を使用） -->
-  <h2 class="text-xl font-bold text-brand-600">武将パラメータ（試作）</h2>
-  <div class="rounded-md border border-slate-200 shadow-sm bg-white p-2">
-    <app-roster></app-roster>
-  </div>
+<!-- メインコンテンツのラッパー（背景を薄いグレーにして目の負担を軽減） -->
+<div class="max-w-screen-xl mx-auto p-4 md:p-6 space-y-4 bg-sango-50">
+  <!-- タブナビ（武将 / 武器） -->
+  <nav class="border-b border-slate-200">
+    <ul class="flex gap-2">
+      <li>
+        <button
+          class="px-3 py-2 text-sm rounded-t-md"
+          [class.bg-white]="selectedTab() === 'roster'"
+          [class.text-sango-800]="selectedTab() === 'roster'"
+          [class.text-slate-600]="selectedTab() !== 'roster'"
+          [class.border-x]="selectedTab() === 'roster'"
+          [class.border-t]="selectedTab() === 'roster'"
+          [class.border-slate-200]="selectedTab() === 'roster'"
+          (click)="selectedTab.set('roster')"
+        >
+          武将パラメータ
+        </button>
+      </li>
+      <li>
+        <button
+          class="px-3 py-2 text-sm rounded-t-md"
+          [class.bg-white]="selectedTab() === 'weapons'"
+          [class.text-sango-800]="selectedTab() === 'weapons'"
+          [class.text-slate-600]="selectedTab() !== 'weapons'"
+          [class.border-x]="selectedTab() === 'weapons'"
+          [class.border-t]="selectedTab() === 'weapons'"
+          [class.border-slate-200]="selectedTab() === 'weapons'"
+          (click)="selectedTab.set('weapons')"
+        >
+          武器一覧
+        </button>
+      </li>
+    </ul>
+  </nav>
 
-  <!-- CSV から読み込んだ武器一覧の表 -->
-  <h2 class="text-xl font-bold text-brand-600">武器一覧</h2>
-  <div class="rounded-md border border-slate-200 shadow-sm bg-white p-2">
-    <app-weapons></app-weapons>
-  </div>
-
-  <!-- 現在の計算ルール（rules.json）を確認するビュー -->
-  <h2 class="text-xl font-bold text-brand-600">設定</h2>
-  <div class="rounded-md border border-slate-200 shadow-sm bg-white p-2">
-    <app-settings></app-settings>
-  </div>
+  <!-- タブ本体 -->
+  <section class="rounded-md border border-slate-200 shadow-sm bg-white p-2">
+    <ng-container *ngIf="selectedTab() === 'roster'; else weaponsTab">
+      <app-roster></app-roster>
+    </ng-container>
+    <ng-template #weaponsTab>
+      <app-weapons></app-weapons>
+    </ng-template>
+  </section>
 </div>
 
 <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
