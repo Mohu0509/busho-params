@@ -1,0 +1,122 @@
+/* グローバルスタイル（Tailwind と AG Grid の読み込み、UI の見た目調整） */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* You can add global styles to this file, and also import other style files */
+/* AG Grid のテーマ/基本スタイルを読み込み */
+@import "ag-grid-community/styles/ag-grid.css";
+@import "ag-grid-community/styles/ag-theme-alpine.css";
+@import "ag-grid-community/styles/ag-theme-quartz.css";
+
+/* 入力可/ラベルを視覚区別 */
+.cell-label {
+  background-color: #fafafa;
+}
+.cell-editable {
+  background-color: #fffbe6;
+}
+
+/* 可読性向上（軽めの調整） */
+.ag-theme-quartz {
+  --ag-font-size: 13px;
+  --ag-grid-size: 4px;
+  --ag-row-height: 36px;
+  --ag-header-height: 38px;
+  --ag-foreground-color: #303030;
+  --ag-background-color: #ffffff;
+  --ag-header-background-color: #f3f6fb;
+  --ag-odd-row-background-color: #fcfdff;
+  --ag-selected-row-background-color: #e6f4ff;
+  --ag-row-hover-color: #f5faff;
+}
+
+/* 全体のフォント（日本語寄り） */
+body, html {
+  font-family: "Meiryo", "Yu Gothic UI", "Segoe UI", Arial, sans-serif;
+}
+
+/* AG Grid 見た目の強化（直接指定で確実に反映） */
+.ag-theme-quartz .ag-header {
+  background-color: #eef2ff; /* indigo-50 */
+  border-bottom: 1px solid #dbeafe; /* blue-100 */
+}
+.ag-theme-quartz .ag-row-hover {
+  background-color: #f0f9ff !important; /* sky-50 */
+}
+.ag-theme-quartz .ag-row-selected {
+  background-color: #e0f2fe !important; /* sky-100 */
+}
+.ag-theme-quartz .ag-cell.cell-editable {
+  background-color: #fff7ed; /* orange-50 */
+}
+.ag-theme-quartz .ag-cell.cell-label {
+  background-color: #f8fafc; /* slate-50 */
+}
+
+/* バッジ（統一スタイル） */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 1.2;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+.badge-meisho {
+  background-color: #fff1f2; /* rose-50 */
+  color: #be123c;            /* rose-700 */
+  border-color: #fecdd3;     /* rose-200 */
+}
+.badge-camp { color: #fff; }
+.badge-camp.camp-shu { background-color: #16a34a; }  /* green-600 */
+.badge-camp.camp-gi  { background-color: #2563eb; }  /* blue-600  */
+.badge-camp.camp-go  { background-color: #f97316; }  /* orange-500 */
+.badge-camp.camp-gun { background-color: #9333ea; }  /* purple-600 */
+.badge-camp.camp-etc { background-color: #64748b; }  /* slate-500  */
+
+/* カスタムチェックボックス（所持） */
+.have-cell .checkpill {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid #94a3b8; /* slate-400 */
+  background-color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .12s ease;
+  box-sizing: border-box;
+  line-height: 1;
+  position: relative;
+  z-index: 1; /* 罫線より上に描画 */
+}
+.ag-theme-quartz .ag-cell.have-cell { 
+  overflow: visible; /* クリップ回避 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.have-cell .checkpill:hover {
+  border-color: #2563eb; /* blue-600 */
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+.have-cell .checkpill.checked {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+.have-cell .checkpill::after {
+  content: '✓';
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: transparent;          /* ← OFF時は不可視だがスペースは確保 */
+}
+.have-cell .checkpill.checked::after {
+  content: '✓';
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  transform: translateY(0);
+}

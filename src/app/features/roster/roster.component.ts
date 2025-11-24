@@ -1,0 +1,268 @@
+// 武将一覧と計算結果を AG Grid で表示・編集するコンポーネント
+// - CSV から武将/武器を読み込み、計算サービスで基準値/最終値を算出します。
+// - グリッド上でレベル/凸/所持を編集すると、即座に再計算されます。
+import { Component, OnInit, computed, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { AgGridAngular } from 'ag-grid-angular';
+import { ColDef, GridReadyEvent } from 'ag-grid-community';
+import { CsvDataRepository } from '@repos/csv-data.repository';
+import { ComputeService } from '@services/compute.service';
+import { AppConfigService } from '@core/app-config.service';
+import { General, UnitState } from '@models/general.model';
+import { Weapon } from '@models/weapon.model';
+import { Rules } from '@models/rules.model';
+
+type RosterRow = General & UnitState & {
+  equipName?: string;
+  strBase?: number; intBase?: number; vitBase?: number; hpBase?: number;
+  strFinal?: number; intFinal?: number; vitFinal?: number; hpFinal?: number;
+};
+
+@Component({
+  selector: 'app-roster',
+  standalone: true,
+  imports: [CommonModule, AgGridAngular],
+  template: `
+    <!-- 読み込み状態や件数、エラーを表示する簡易ヘッダー -->
+    <div style="margin-bottom: 8px;">
+      <span>読み込み: {{ loading() ? '中' : '完了' }}</span>
+      <span style="margin-left: 12px;">件数: {{ rows().length }}</span>
+      <span *ngIf="error()" style="margin-left: 12px; color: #c00;">エラー: {{ error() }}</span>
+    </div>
+    <ag-grid-angular
+      class="ag-theme-quartz"
+      style="width: 100%; height: 80vh;"
+      [rowData]="rows()"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="defaultColDef"
+      [localeText]="localeJA"
+      (gridReady)="onGridReady($event)"
+      (cellValueChanged)="onCellValueChanged($event)"
+    />
+  `,
+})
+export class RosterComponent implements OnInit {
+  // 画面に表示する行データ（signal でリアクティブに更新）
+  rows = signal<RosterRow[]>([]);
+  weapons: Weapon[] = [];
+  rules!: Rules;
+  // 進捗やエラー表示用の状態
+  loading = signal<boolean>(true);
+  error = signal<string | null>(null);
+
+  // 全列に共通の設定（サイズ変更・ソート・フィルタなど）
+  defaultColDef: ColDef<RosterRow> = {
+    resizable: true,
+    sortable: true,
+    filter: true,
+    cellClass: (p) => (p.colDef.editable ? 'cell-editable' : 'cell-label'),
+  };
+
+  // 列ごとの表示/編集ルールを定義
+  columnDefs: ColDef<RosterRow>[] = [
+    { field: 'no', headerName: 'No', width: 70, pinned: 'left', cellClass: 'ag-right-aligned-cell' },
+    {
+      field: 'camp',
+      headerName: '陣営',
+      width: 90,
+      pinned: 'left',
+      filter: 'agSetColumnFilter',
+      cellRenderer: (p: any) => campBadge(p.value),
+      cellClass: 'ag-center-aligned-cell cell-label',
+    },
+    {
+      headerName: '名将',
+      width: 80,
+      editable: false,
+      valueGetter: (p) => (p.data?.meisho ? '○' : ''),
+      pinned: 'left',
+      cellRenderer: (p: any) => (p.value === '○' ? `<span class="badge badge-meisho">名将</span>` : ''),
+      cellClass: 'ag-center-aligned-cell cell-label',
+      filter: false,
+    },
+    { field: 'name', headerName: '武将名', width: 160, pinned: 'left' },
+    {
+      field: 'have',
+      headerName: '所持',
+      width: 80,
+      editable: false,
+      cellDataType: 'boolean',
+      cellRenderer: (p: any) => this.haveCellRenderer(p),
+      cellClass: 'ag-center-aligned-cell cell-editable have-cell',
+    },
+    {
+      field: 'toku',
+      headerName: '凸',
+      width: 80,
+      editable: true,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: { values: [0, 1, 2, 3, 4, 5] },
+      valueFormatter: (p) => `${p.value}`,
+      cellClass: 'ag-right-aligned-cell cell-editable',
+    },
+    {
+      field: 'level',
+      headerName: 'レベル',
+      width: 100,
+      editable: true,
+      cellEditor: 'agNumberCellEditor',
+      valueFormatter: (p) => `${p.value}`,
+      cellClass: 'ag-right-aligned-cell cell-editable',
+    },
+    { field: 'equipName', headerName: '装備', width: 160 },
+    { field: 'strInit', headerName: '武(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'intInit', headerName: '知(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'vitInit', headerName: '耐(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'hpInit', headerName: '体(初期)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'strBase', headerName: '武(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'intBase', headerName: '知(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'vitBase', headerName: '耐(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'hpBase', headerName: '体(基準)', width: 100, cellClass: 'ag-right-aligned-cell' },
+    { field: 'strFinal', headerName: '武(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
+    { field: 'intFinal', headerName: '知(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
+    { field: 'vitFinal', headerName: '耐(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
+    { field: 'hpFinal', headerName: '体(最終)', width: 110, cellClass: 'ag-right-aligned-cell' },
+  ];
+
+  constructor(
+    private readonly repo: CsvDataRepository,
+    private readonly compute: ComputeService,
+    private readonly appConfig: AppConfigService
+  ) {}
+
+  // 最小限の日本語ロケール（必要に応じて拡張可能）
+  readonly localeJA: Record<string, string> = {
+    page: 'ページ',
+    more: 'もっと',
+    to: '～',
+    of: '／',
+    next: '次',
+    last: '最後',
+    first: '最初',
+    previous: '前',
+    loadingOoo: '読み込み中...',
+    applyFilter: '適用',
+    equals: '等しい',
+    notEqual: '等しくない',
+    contains: '含む',
+    notContains: '含まない',
+    startsWith: 'で始まる',
+    endsWith: 'で終わる',
+    filterOoo: 'フィルタ...',
+    selectAll: 'すべて選択',
+    searchOoo: '検索...',
+    noRowsToShow: '表示する行がありません',
+    blank: '空白',
+    notBlank: '空白以外',
+    // ヘッダツールパネル
+    columns: '列',
+    filters: 'フィルタ',
+  };
+
+  // 初期化：ルール→CSV 取得→行作成→再計算→反映
+  async ngOnInit(): Promise<void> {
+    try {
+      this.rules = await this.appConfig.loadRules();
+      const [generals, weapons] = await Promise.all([
+        this.repo.loadGenerals(),
+        this.repo.loadWeapons(),
+      ]);
+      console.log('generals loaded:', generals.length);
+      console.log('weapons loaded:', weapons.length);
+      this.weapons = weapons;
+      const rows = generals.map(g => this.createRow(g));
+      rows.forEach(r => this.recalculate(r));
+      this.rows.set(rows);
+    } catch (e: any) {
+      console.error('データ読み込みエラー', e);
+      this.error.set(e?.message ?? '読み込みに失敗しました');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  onGridReady(_e: GridReadyEvent): void {}
+
+  // セル編集時に値を補正し、再計算して反映
+  onCellValueChanged(event: any): void {
+    const row: RosterRow = event.data;
+    row.level = clampInt(row.level, this.rules.limits.level.min, this.rules.limits.level.max, this.rules.defaults.level);
+    row.toku = clampInt(row.toku, this.rules.limits.toku.min, this.rules.limits.toku.max, this.rules.defaults.toku);
+    row.have = !!row.have;
+    this.recalculate(row);
+    this.rows.set([...this.rows()]);
+  }
+
+  // 武将データから表示用の 1 行を組み立てる
+  private createRow(general: General): RosterRow {
+    const defaultState: UnitState = {
+      have: false,
+      level: this.rules.defaults.level,
+      toku: this.rules.defaults.toku,
+      equipWeaponId: this.autopickWeaponId(general),
+    };
+    const equip = this.weapons.find(w => w.id === defaultState.equipWeaponId) || null;
+    return {
+      ...general,
+      ...defaultState,
+      equipName: equip?.name ?? '',
+    };
+  }
+
+  // 基準値/最終値を計算し、行に書き戻す
+  private recalculate(row: RosterRow): void {
+    const weapon = this.weapons.find(w => w.id === row.equipWeaponId) || null;
+    const base = this.compute.computeBaseStats(row, weapon);
+    const finals = this.compute.computeFinalStats(base, row.level, row.toku, this.rules);
+    Object.assign(row, finals);
+    row.equipName = weapon?.name ?? '';
+  }
+
+  // 所有者名が一致する武器があれば自動選択（なければ null）
+  private autopickWeaponId(general: General): number | null {
+    const byOwner = this.weapons.find(w => w.owner === general.name);
+    return byOwner?.id ?? null;
+  }
+
+  // カスタムチェックボックス（所持）
+  private haveCellRenderer = (p: any): HTMLElement => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `checkpill${p.value ? ' checked' : ''}`;
+    btn.setAttribute('aria-label', p.value ? '所持あり' : '所持なし');
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      const newVal = !p.value;
+      p.node.setDataValue('have', newVal);
+      this.onCellValueChanged({ data: p.node.data });
+      // 再描画
+      p.api.refreshCells({ rowNodes: [p.node], columns: [p.column] });
+    };
+    return btn;
+  };
+}
+
+function campBadge(camp: string | undefined): string {
+  if (!camp) return '';
+  const map: Record<string, string> = {
+    '蜀': 'camp-shu',
+    '魏': 'camp-gi',
+    '呉': 'camp-go',
+    '群': 'camp-gun',
+  };
+  const cls = map[camp] ?? 'camp-etc';
+  return `<span class="badge badge-camp ${cls}">${camp}</span>`;
+}
+
+function clampInt(
+  value: any,
+  min: number,
+  max: number,
+  fallback: number
+): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(n)));
+}
+
+
