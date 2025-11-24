@@ -33,13 +33,14 @@ jobs:
 
       - name: Build Angular app
         run: |
-          npm run build -- --configuration production --base-href "/busho-params/"
+          npx ng build --configuration=production --base-href "/bari-bari-data/"
+          # SPA ルーティング対応（リロード 404 回避）
+          cp dist/bari-bari-data/browser/index.html dist/bari-bari-data/browser/404.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/busho-params/browser
-          # ↑ angular.json で確認して、必要なら修正してください
+          path: dist/bari-bari-data/browser
 
   deploy:
     needs: build
