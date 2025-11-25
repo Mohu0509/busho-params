@@ -4,7 +4,7 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef, GridReadyEvent, GetRowIdParams } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GetRowIdParams, GridApi } from 'ag-grid-community';
 import { CsvDataRepository } from '@repos/csv-data.repository';
 import { ComputeService } from '@services/compute.service';
 import { AppConfigService } from '@core/app-config.service';
@@ -24,14 +24,20 @@ type RosterRow = General & UnitState & {
   standalone: true,
   imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent],
   template: `
-    <!-- 読み込み状態や件数、エラーを表示する簡易ヘッダー -->
-    <div style="margin-bottom: 8px;">
-      <span>読み込み: {{ loading() ? '中' : '完了' }}</span>
-      <span style="margin-left: 12px;">件数: {{ rows().length }}</span>
-      <span *ngIf="error()" style="margin-left: 12px; color: #c00;">エラー: {{ error() }}</span>
+    <!-- ツールバー（切替ボタン＋必要ならエラーのみ） -->
+    <div style="margin-bottom: 8px; display:flex; align-items:center; gap:12px;">
+      <button
+        type="button"
+        (click)="toggleCompact()"
+        class="toolbar-btn"
+        style="margin-left: 0;"
+      >
+        {{ compactOnly() ? '全表示' : '簡易表示' }}
+      </button>
+      <span *ngIf="error()" style="color: #c00;">エラー: {{ error() }}</span>
     </div>
     <ag-grid-angular
-      class="ag-theme-quartz"
+      class="ag-theme-quartz ag-scope-roster"
       style="width: 100%; height: 80vh;"
       [rowData]="rows()"
       [columnDefs]="columnDefs"
@@ -54,6 +60,10 @@ export class RosterComponent implements OnInit {
   // 進捗やエラー表示用の状態
   loading = signal<boolean>(true);
   error = signal<string | null>(null);
+  // 重要列のみ表示の切替（初期: 簡易表示 = true）
+  compactOnly = signal<boolean>(true);
+  // Grid API を保持（列表示/非表示の一括適用に使用）
+  private gridApi: GridApi<RosterRow> | null = null;
   // （外部フィルタは撤去。AG Grid内蔵フィルタに一本化）
 
   // 全列に共通の設定（サイズ変更・ソート・フィルタなど）
@@ -61,7 +71,6 @@ export class RosterComponent implements OnInit {
     resizable: true,
     sortable: true,
     filter: true,
-    // フローティングフィルタは無効化（ヘッダーとメニューを1行に）
     floatingFilter: false,
     cellClass: (p) => (p.colDef.editable ? 'cell-editable' : 'cell-label'),
   };
@@ -137,25 +146,25 @@ export class RosterComponent implements OnInit {
     // equip: フィルタ× / ソート×
     { field: 'equipName', headerName: '装備', width: 160, filter: false, sortable: false },
     // *_init: フィルタ× / ソート○
-    { field: 'strInit', headerName: '武(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'intInit', headerName: '知(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'vitInit', headerName: '耐(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'hpInit', headerName: '体(初期)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'strInit', headerName: '武(初期)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'intInit', headerName: '知(初期)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'vitInit', headerName: '耐(初期)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'hpInit', headerName: '体(初期)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     // *_base: フィルタ× / ソート○
-    { field: 'strBase', headerName: '武(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'intBase', headerName: '知(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'vitBase', headerName: '耐(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'hpBase', headerName: '体(基準)', width: 100, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'strBase', headerName: '武(基準)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'intBase', headerName: '知(基準)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'vitBase', headerName: '耐(基準)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'hpBase', headerName: '体(基準)', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     // *_final: フィルタ× / ソート○
-    { field: 'strFinal', headerName: '武(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'intFinal', headerName: '知(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'vitFinal', headerName: '耐(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    { field: 'hpFinal', headerName: '体(最終)', width: 110, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'strFinal', headerName: '武', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'intFinal', headerName: '知', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'vitFinal', headerName: '耐', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
+    { field: 'hpFinal', headerName: '体', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     // state_*: フィルタ（テキスト: equals）/ ソート○
-    { field: 'stateAngry', headerName: '怒', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateNormal', headerName: '普', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateFollowPre', headerName: '追元', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateFollowPost', headerName: '追後', width: 110, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    { field: 'stateAngry', headerName: '怒', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    { field: 'stateNormal', headerName: '普', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    { field: 'stateFollowPre', headerName: '追元', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    { field: 'stateFollowPost', headerName: '追後', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
   ];
 
   constructor(
@@ -215,7 +224,10 @@ export class RosterComponent implements OnInit {
     }
   }
 
-  onGridReady(_e: GridReadyEvent): void {}
+  onGridReady(e: GridReadyEvent): void {
+    this.gridApi = e.api as GridApi<RosterRow>;
+    this.applyCompactVisibility();
+  }
 
   // セル編集時に値を補正し、再計算して反映
   onCellValueChanged(event: any): void {
@@ -278,6 +290,28 @@ export class RosterComponent implements OnInit {
     };
     return btn;
   };
+
+  // 切替ボタンクリック時に表示列を適用
+  toggleCompact(): void {
+    this.compactOnly.update(v => !v);
+    this.applyCompactVisibility();
+  }
+
+  // 重要列のみ表示の適用（true のとき指定列以外を hide）
+  private applyCompactVisibility(): void {
+    if (!this.gridApi) return;
+    const important = [
+      'name', 'level', 'toku',
+      'strFinal', 'intFinal', 'vitFinal', 'hpFinal',
+      'stateAngry', 'stateNormal', 'stateFollowPre', 'stateFollowPost',
+    ];
+    const all = this.gridApi.getColumns()?.map((c: any) => c.getColId()) ?? [];
+    const state = all.map((colId: string) => ({
+      colId,
+      hide: this.compactOnly() ? !important.includes(colId) : false,
+    }));
+    this.gridApi.applyColumnState({ state, applyOrder: false });
+  }
 }
 
 function campBadge(camp: string | undefined): string {
@@ -302,5 +336,4 @@ function clampInt(
   if (Number.isNaN(n)) return fallback;
   return Math.max(min, Math.min(max, Math.trunc(n)));
 }
-
 

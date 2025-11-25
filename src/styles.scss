@@ -25,7 +25,6 @@
   --ag-header-height: 38px;
   --ag-foreground-color: #303030;
   --ag-background-color: #ffffff;
-  --ag-header-background-color: #f3f6fb;
   --ag-odd-row-background-color: #fcfdff;
   --ag-selected-row-background-color: #e6f4ff;
   --ag-row-hover-color: #f5faff;
@@ -36,22 +35,58 @@ body, html {
   font-family: "Meiryo", "Yu Gothic UI", "Segoe UI", Arial, sans-serif;
 }
 
-/* AG Grid 見た目の強化（直接指定で確実に反映） */
-.ag-theme-quartz .ag-header {
-  background-color: #efe9db; /* sango-100 */
-  border-bottom: 1px solid #e2d7bf; /* sango-200 */
+/* AG Grid 行ホバー/選択（ロスター以外のグリッドに青系を残す） */
+.ag-theme-quartz:not(.ag-scope-roster) .ag-row-hover {
+  background-color: theme('colors.sky.50');
 }
-.ag-theme-quartz .ag-row-hover {
-  background-color: #f0f9ff !important; /* sky-50 */
-}
-.ag-theme-quartz .ag-row-selected {
-  background-color: #e0f2fe !important; /* sky-100 */
+.ag-theme-quartz:not(.ag-scope-roster) .ag-row-selected {
+  background-color: theme('colors.sky.100');
 }
 .ag-theme-quartz .ag-cell.cell-editable {
   background-color: #fff7ed; /* orange-50 */
 }
 .ag-theme-quartz .ag-cell.cell-label {
   background-color: #f8fafc; /* slate-50 */
+}
+
+@layer utilities {
+  /* Roster グリッドだけ淡い緑基調で統一（Tailwind のトークンを使用） */
+  .ag-scope-roster {
+    --ag-header-background-color: theme('colors.green.50');
+    --ag-header-foreground-color: theme('colors.emerald.900');
+    --ag-header-border-color: theme('colors.green.200');
+    --ag-header-cell-hover-background-color: theme('colors.green.100');
+
+    --ag-row-hover-color: theme('colors.green.50');
+    --ag-selected-row-background-color: theme('colors.green.100');
+    --ag-border-color: theme('colors.slate.200');
+
+    --ag-header-height: 40px;
+  }
+
+  /* 密度調整（必要に応じて付与） */
+  .ag-density-compact { --ag-row-height: 32px; --ag-grid-size: 3px; }
+  .ag-density-comfort { --ag-row-height: 40px; --ag-grid-size: 6px; }
+}
+
+/* ツールバー ボタン（カラフル・見やすい緑系） */
+.toolbar-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #16a34a;       /* green-600 */
+  background: linear-gradient(180deg, #34d399 0%, #10b981 100%); /* emerald 400→500 */
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.25);
+  transition: transform .06s ease, box-shadow .12s ease, filter .12s ease;
+}
+.toolbar-btn:hover {
+  filter: brightness(1.03);
+  box-shadow: 0 2px 6px rgba(16,185,129,0.25);
+}
+.toolbar-btn:active {
+  transform: translateY(1px);
 }
 
 /* AG Grid ポップアップ（メニュー/フィルタ）が背面に隠れないよう最前面へ */
@@ -127,3 +162,4 @@ body, html {
   font-weight: 700;
   transform: translateY(0);
 }
+/* ヘッダー中央寄せ関連は撤去（競合回避のため） */
