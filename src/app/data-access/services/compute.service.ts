@@ -45,12 +45,17 @@ export class ComputeService {
   // 1 項目分の最終値を計算するヘルパー
   computeFinalStat(base: number, level: number, toku: number, rules: Rules): number {
     const q = Math.floor(level / 10);
-    const factor =
-      rules.levelFactor.hundredsRule && level === 100 && toku < 5
-        ? (q - 1) * (1 + 0.15 * toku)
-        : q * (1 + 0.15 * toku);
-    const value = base + base * 0.1 * (level - 1) + base * 0.5 * factor;
-    return applyRounding(value, rules.rounding.finalStats);
+    // 100 レベル特例: toku(凸) < 5 のとき 10刻みボーナスから 0.5 を減算
+    const d = rules.levelFactor.hundredsRule && level === 100 && toku < 5 ? -0.5 : 0;
+
+    // (ベース + レベル成長 + 10刻みボーナス＋特例) に最後に凸補正を掛ける
+    const inner =
+      base
+      + base * 0.1 * (level - 1)
+      + base * (0.5 * q + d);
+
+    const multiplied = inner * (1 + 0.15 * toku);
+    return applyRounding(multiplied, rules.rounding.finalStats);
   }
 }
 

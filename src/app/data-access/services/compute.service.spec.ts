@@ -15,8 +15,9 @@ describe('ComputeService', () => {
     const level = 50; // q=5
     const toku = 4;
     const q = Math.floor(level / 10);
-    const factor = q * (1 + 0.15 * toku);
-    const expected = Math.floor(base + base * 0.1 * (level - 1) + base * 0.5 * factor);
+    const d = 0; // level 100 ではないため特例なし
+    const inner = base + base * 0.1 * (level - 1) + base * (0.5 * q + d);
+    const expected = Math.floor(inner * (1 + 0.15 * toku));
     expect(service.computeFinalStat(base, level, toku, rules)).toBe(expected);
   });
 
@@ -25,8 +26,9 @@ describe('ComputeService', () => {
     const level = 100; // q=10
     const toku = 4; // <5 triggers (q-1)
     const q = Math.floor(level / 10);
-    const factor = (q - 1) * (1 + 0.15 * toku);
-    const expected = Math.floor(base + base * 0.1 * (level - 1) + base * 0.5 * factor);
+    const d = -0.5; // 100 特例
+    const inner = base + base * 0.1 * (level - 1) + base * (0.5 * q + d);
+    const expected = Math.floor(inner * (1 + 0.15 * toku));
     expect(service.computeFinalStat(base, level, toku, rules)).toBe(expected);
   });
 });
