@@ -1,0 +1,45 @@
+<div class="relative pt-9">
+  <div class="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-2 py-1.5 bg-white/90 backdrop-blur-sm">
+    <button
+      type="button"
+      (click)="toggleCompact()"
+      class="inline-flex items-center justify-center h-6 px-2.5 py-0.5 text-xs rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:translate-y-[1px]"
+      style="margin-left: 0;"
+    >
+      {{ compactOnly() ? '全表示' : '簡易表示' }}
+    </button>
+    <div class="flex gap-1.5 overflow-x-auto whitespace-nowrap">
+      <button
+        *ngFor="let p of presetList"
+        type="button"
+        [attr.aria-pressed]="activePreset === p"
+        (click)="applyPreset(p)"
+        [ngClass]="[
+          'inline-flex items-center justify-center h-6 px-2.5 py-0.5 text-xs rounded-full border shadow-sm transition',
+          'focus:outline-none focus:ring-2 focus:ring-blue-400/50',
+          activePreset === p
+            ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+        ]"
+      >
+        {{ p }}
+      </button>
+    </div>
+    <span *ngIf="error()" class="ml-auto text-red-600 text-xs">エラー: {{ error() }}</span>
+  </div>
+
+  <ag-grid-angular
+    class="ag-theme-quartz ag-scope-roster"
+    style="width: 100%; height: 80vh;"
+    [rowData]="rows()"
+    [columnDefs]="columnDefs"
+    [defaultColDef]="defaultColDef"
+    [localeText]="localeJA"
+    [getRowId]="getRowId"
+    [suppressScrollOnNewData]="true"
+    (gridReady)="onGridReady($event)"
+    (cellValueChanged)="onCellValueChanged($event)"
+  />
+</div>
+
+

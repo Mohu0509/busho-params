@@ -89,6 +89,22 @@ body, html {
   transform: translateY(1px);
 }
 
+/* ツールバー ボタン（控えめ・見やすい中立色） */
+.toolbar-btn.toolbar-btn--muted {
+  border: 1px solid #cbd5e1; /* slate-300 */
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); /* slate-50 → very light */
+  color: #334155; /* slate-700 */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.toolbar-btn.toolbar-btn--muted:hover {
+  filter: none;
+  border-color: #94a3b8; /* slate-400 */
+  box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+}
+.toolbar-btn.toolbar-btn--muted:active {
+  transform: translateY(1px);
+}
+
 /* AG Grid ポップアップ（メニュー/フィルタ）が背面に隠れないよう最前面へ */
 .ag-theme-quartz .ag-menu,
 .ag-theme-quartz .ag-popup,

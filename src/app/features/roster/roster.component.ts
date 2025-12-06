@@ -12,6 +12,10 @@ import { General, UnitState } from '@models/general.model';
 import { Weapon } from '@models/weapon.model';
 import { Rules } from '@models/rules.model';
 import { HaveBooleanFilterComponent } from './have-boolean-filter.component';
+// プリセット（表示名→gX）の定義を別ファイルで一元管理
+import { presetKeyMap, presetList as PRESET_LIST } from './config/presets';
+// 固定選択肢フィルタ（Community対応）を filters 配下へ配置
+import { FixedSetFilterComponent } from './filters/fixed-set-filter.component';
 
 type RosterRow = General & UnitState & {
   equipName?: string;
@@ -22,33 +26,9 @@ type RosterRow = General & UnitState & {
 @Component({
   selector: 'app-roster',
   standalone: true,
-  imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent],
-  template: `
-    <!-- ツールバー（切替ボタン＋必要ならエラーのみ） -->
-    <div style="margin-bottom: 8px; display:flex; align-items:center; gap:12px;">
-      <button
-        type="button"
-        (click)="toggleCompact()"
-        class="toolbar-btn"
-        style="margin-left: 0;"
-      >
-        {{ compactOnly() ? '全表示' : '簡易表示' }}
-      </button>
-      <span *ngIf="error()" style="color: #c00;">エラー: {{ error() }}</span>
-    </div>
-    <ag-grid-angular
-      class="ag-theme-quartz ag-scope-roster"
-      style="width: 100%; height: 80vh;"
-      [rowData]="rows()"
-      [columnDefs]="columnDefs"
-      [defaultColDef]="defaultColDef"
-      [localeText]="localeJA"
-      [getRowId]="getRowId"
-      [suppressScrollOnNewData]="true"
-      (gridReady)="onGridReady($event)"
-      (cellValueChanged)="onCellValueChanged($event)"
-    />
-  `,
+  // AG Grid のカスタムフィルタはテンプレ外利用でも imports に登録が必要
+  imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent, FixedSetFilterComponent],
+  templateUrl: './roster.component.html',
 })
 export class RosterComponent implements OnInit {
   // 画面に表示する行データ（signal でリアクティブに更新）
@@ -65,7 +45,13 @@ export class RosterComponent implements OnInit {
   // Grid API を保持（列表示/非表示の一括適用に使用）
   private gridApi: GridApi<RosterRow> | null = null;
   // （外部フィルタは撤去。AG Grid内蔵フィルタに一本化）
-
+  // 追加: プリセット用
+  private allRows: RosterRow[] = [];
+  // ボタンの現在選択（null で未選択＝全件表示）
+  activePreset: (keyof typeof presetKeyMap) | null = null;
+  // プリセットの表示順（config 定義）
+  presetList = PRESET_LIST;
+ 
   // 全列に共通の設定（サイズ変更・ソート・フィルタなど）
   defaultColDef: ColDef<RosterRow> = {
     resizable: true,
@@ -126,9 +112,9 @@ export class RosterComponent implements OnInit {
       cellEditorParams: { values: [0, 1, 2, 3, 4, 5] },
       valueFormatter: (p) => `${p.value}`,
       cellClass: 'ag-right-aligned-cell cell-editable',
-      // toku: フィルタ（数値: equals）/ ソート○
-      filter: 'agNumberColumnFilter',
-      filterParams: { filterOptions: ['equals'] },
+      // 凸: 固定選択（0～5）
+      filter: FixedSetFilterComponent,
+      filterParams: { values: [0, 1, 2, 3, 4, 5] },
       sortable: true,
     },
     {
@@ -160,11 +146,39 @@ export class RosterComponent implements OnInit {
     { field: 'intFinal', headerName: '知', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     { field: 'vitFinal', headerName: '耐', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     { field: 'hpFinal', headerName: '体', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    // state_*: フィルタ（テキスト: equals）/ ソート○
-    { field: 'stateAngry', headerName: '怒', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateNormal', headerName: '普', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateFollowPre', headerName: '追元', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateFollowPost', headerName: '追後', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    // state_*: 固定選択の Set フィルタ / ソート○
+    {
+      field: 'stateAngry',
+      headerName: '怒',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし'] },
+      sortable: true,
+    },
+    {
+      field: 'stateNormal',
+      headerName: '普',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし'] },
+      sortable: true,
+    },
+    {
+      field: 'stateFollowPre',
+      headerName: '追元',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし', 'ｶｳﾝﾀｰ', 'ALL', '召喚'] },
+      sortable: true,
+    },
+    {
+      field: 'stateFollowPost',
+      headerName: '追後',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし', 'ｶｳﾝﾀｰ', 'ALL', '召喚'] },
+      sortable: true,
+    },
   ];
 
   constructor(
@@ -215,7 +229,8 @@ export class RosterComponent implements OnInit {
       this.weapons = weapons;
       const rows = generals.map(g => this.createRow(g));
       rows.forEach(r => this.recalculate(r));
-      this.rows.set(rows);
+      this.allRows = rows;
+      this.rows.set(this.applyPresetFilter(this.allRows)); //フィルタ用ボタンの押下状態で絞込
     } catch (e: any) {
       console.error('データ読み込みエラー', e);
       this.error.set(e?.message ?? '読み込みに失敗しました');
@@ -265,6 +280,19 @@ export class RosterComponent implements OnInit {
     const finals = this.compute.computeFinalStats(base, row.level, row.toku, this.rules);
     Object.assign(row, finals);
     row.equipName = weapon?.name ?? '';
+  }
+
+  applyPreset(preset: string): void {
+    this.activePreset = this.activePreset === preset ? null : (preset as any);
+    this.rows.set(this.applyPresetFilter(this.allRows));
+  }
+
+  // プリセットフィルター（activePreset が設定されていれば、そのプリセットに合致する行のみを返す）
+  // 要は、activePreset に設定されているプリセットの武将のみを表示する
+  private applyPresetFilter(source: RosterRow[]): RosterRow[] {
+    if (!this.activePreset) return source;
+    const key = presetKeyMap[this.activePreset];
+    return source.filter(r => !!(r as any)[key]);
   }
 
   // 所有者名が一致する武器があれば自動選択（なければ null）
