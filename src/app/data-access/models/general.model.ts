@@ -18,7 +18,13 @@ export interface General {
   g5?: string;
   g6?: string;
   g7?: string;
-
+  g8?: string;
+  g9?: string;
+  g10?: string;
+  g11?: string;
+  g12?: string;
+  g13?: string;
+  
   stateAngry?: string;
   stateNormal?: string;
   stateFollowPre?: string;

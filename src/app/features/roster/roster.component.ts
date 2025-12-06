@@ -24,17 +24,34 @@ type RosterRow = General & UnitState & {
   standalone: true,
   imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent],
   template: `
-    <!-- ツールバー（切替ボタン＋必要ならエラーのみ） -->
-    <div style="margin-bottom: 8px; display:flex; align-items:center; gap:12px;">
+  <div class="relative pt-9">
+    <div class="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-2 py-1.5 bg-white/90 backdrop-blur-sm">
       <button
         type="button"
         (click)="toggleCompact()"
-        class="toolbar-btn"
+        class="inline-flex items-center justify-center h-6 px-2.5 py-0.5 text-xs rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:translate-y-[1px]"
         style="margin-left: 0;"
       >
         {{ compactOnly() ? '全表示' : '簡易表示' }}
       </button>
-      <span *ngIf="error()" style="color: #c00;">エラー: {{ error() }}</span>
+      <div class="flex gap-1.5 overflow-x-auto whitespace-nowrap">
+        <button
+          *ngFor="let p of presetList"
+          type="button"
+          [attr.aria-pressed]="activePreset === p"
+          (click)="applyPreset(p)"
+          [ngClass]="[
+            'inline-flex items-center justify-center h-6 px-2.5 py-0.5 text-xs rounded-full border shadow-sm transition',
+            'focus:outline-none focus:ring-2 focus:ring-blue-400/50',
+            activePreset === p
+              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+          ]"
+        >
+          {{ p }}
+        </button>
+      </div>
+      <span *ngIf="error()" class="ml-auto text-red-600 text-xs">エラー: {{ error() }}</span>
     </div>
     <ag-grid-angular
       class="ag-theme-quartz ag-scope-roster"
@@ -48,7 +65,9 @@ type RosterRow = General & UnitState & {
       (gridReady)="onGridReady($event)"
       (cellValueChanged)="onCellValueChanged($event)"
     />
+  </div>
   `,
+  styles: [],
 })
 export class RosterComponent implements OnInit {
   // 画面に表示する行データ（signal でリアクティブに更新）
@@ -65,7 +84,28 @@ export class RosterComponent implements OnInit {
   // Grid API を保持（列表示/非表示の一括適用に使用）
   private gridApi: GridApi<RosterRow> | null = null;
   // （外部フィルタは撤去。AG Grid内蔵フィルタに一本化）
-
+  // 追加: プリセット用
+  private allRows: RosterRow[] = [];
+  activePreset: '地上' | '富甲' | '龍吟' | '孫劉' | '火鳳' | '龍舞' | '五虎' | '智掌' | 'ｼﾘｳｽ' | 'ﾓﾔﾓﾔ' | '君臨' | '傾城' | '北玄' | null = null;
+  // プリセット名 → General のキー
+  private readonly presetKeyMap = {
+    '地上': 'g1',
+    '五虎': 'g2',
+    '龍舞': 'g3',
+    '火鳳': 'g4',
+    '孫劉': 'g5',
+    '龍吟': 'g6',
+    '富甲': 'g7',
+    '智掌': 'g8',
+    'ｼﾘｳｽ': 'g9',
+    'ﾓﾔﾓﾔ': 'g10',
+    '君臨': 'g11',
+    '傾城': 'g12',
+    '北玄': 'g13',
+ } as const;
+ // プリセット一覧（表示順は presetKeyMap の定義順）
+ presetList = Object.keys(this.presetKeyMap) as Array<keyof typeof this.presetKeyMap>;
+ 
   // 全列に共通の設定（サイズ変更・ソート・フィルタなど）
   defaultColDef: ColDef<RosterRow> = {
     resizable: true,
@@ -215,7 +255,8 @@ export class RosterComponent implements OnInit {
       this.weapons = weapons;
       const rows = generals.map(g => this.createRow(g));
       rows.forEach(r => this.recalculate(r));
-      this.rows.set(rows);
+      this.allRows = rows;
+      this.rows.set(this.applyPresetFilter(this.allRows)); //フィルタ用ボタンの押下状態で絞込
     } catch (e: any) {
       console.error('データ読み込みエラー', e);
       this.error.set(e?.message ?? '読み込みに失敗しました');
@@ -265,6 +306,19 @@ export class RosterComponent implements OnInit {
     const finals = this.compute.computeFinalStats(base, row.level, row.toku, this.rules);
     Object.assign(row, finals);
     row.equipName = weapon?.name ?? '';
+  }
+
+  applyPreset(preset: string): void {
+    this.activePreset = this.activePreset === preset ? null : (preset as any);
+    this.rows.set(this.applyPresetFilter(this.allRows));
+  }
+
+  // プリセットフィルター（activePreset が設定されていれば、そのプリセットに合致する行のみを返す）
+  // 要は、activePreset に設定されているプリセットの武将のみを表示する
+  private applyPresetFilter(source: RosterRow[]): RosterRow[] {
+    if (!this.activePreset) return source;
+    const key = this.presetKeyMap[this.activePreset];
+    return source.filter(r => !!(r as any)[key]);
   }
 
   // 所有者名が一致する武器があれば自動選択（なければ null）

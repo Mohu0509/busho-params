@@ -72,10 +72,16 @@ export class CsvDataRepository {
         g5: f[12] || undefined,
         g6: f[13] || undefined,
         g7: f[14] || undefined,
-        stateAngry: f[15] || undefined,
-        stateNormal: f[16] || undefined,
-        stateFollowPre: f[17] || undefined,
-        stateFollowPost: f[18] || undefined,
+        g8: f[15] || undefined,
+        g9: f[16] || undefined,
+        g10: f[17] || undefined,
+        g11: f[18] || undefined,
+        g12: f[19] || undefined,
+        g13: f[20] || undefined,
+        stateAngry: f[21] || undefined,
+        stateNormal: f[22] || undefined,
+        stateFollowPre: f[23] || undefined,
+        stateFollowPost: f[24] || undefined,
       };
       generals.push(general);
     }
