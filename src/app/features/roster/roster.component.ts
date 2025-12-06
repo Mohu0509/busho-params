@@ -12,6 +12,7 @@ import { General, UnitState } from '@models/general.model';
 import { Weapon } from '@models/weapon.model';
 import { Rules } from '@models/rules.model';
 import { HaveBooleanFilterComponent } from './have-boolean-filter.component';
+import { FixedSetFilterComponent } from './fixed-set-filter.component';
 
 type RosterRow = General & UnitState & {
   equipName?: string;
@@ -22,7 +23,7 @@ type RosterRow = General & UnitState & {
 @Component({
   selector: 'app-roster',
   standalone: true,
-  imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent],
+  imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent, FixedSetFilterComponent],
   template: `
   <div class="relative pt-9">
     <div class="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-2 py-1.5 bg-white/90 backdrop-blur-sm">
@@ -166,9 +167,9 @@ export class RosterComponent implements OnInit {
       cellEditorParams: { values: [0, 1, 2, 3, 4, 5] },
       valueFormatter: (p) => `${p.value}`,
       cellClass: 'ag-right-aligned-cell cell-editable',
-      // toku: フィルタ（数値: equals）/ ソート○
-      filter: 'agNumberColumnFilter',
-      filterParams: { filterOptions: ['equals'] },
+      // 凸: 固定選択（0～5）
+      filter: FixedSetFilterComponent,
+      filterParams: { values: [0, 1, 2, 3, 4, 5] },
       sortable: true,
     },
     {
@@ -200,11 +201,39 @@ export class RosterComponent implements OnInit {
     { field: 'intFinal', headerName: '知', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     { field: 'vitFinal', headerName: '耐', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
     { field: 'hpFinal', headerName: '体', width: 90, cellClass: 'ag-right-aligned-cell', filter: false, sortable: true },
-    // state_*: フィルタ（テキスト: equals）/ ソート○
-    { field: 'stateAngry', headerName: '怒', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateNormal', headerName: '普', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateFollowPre', headerName: '追元', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
-    { field: 'stateFollowPost', headerName: '追後', width: 90, filter: 'agTextColumnFilter', filterParams: { filterOptions: ['equals'] }, sortable: true },
+    // state_*: 固定選択の Set フィルタ / ソート○
+    {
+      field: 'stateAngry',
+      headerName: '怒',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし'] },
+      sortable: true,
+    },
+    {
+      field: 'stateNormal',
+      headerName: '普',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし'] },
+      sortable: true,
+    },
+    {
+      field: 'stateFollowPre',
+      headerName: '追元',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし', 'ｶｳﾝﾀｰ', 'ALL', '召喚'] },
+      sortable: true,
+    },
+    {
+      field: 'stateFollowPost',
+      headerName: '追後',
+      width: 90,
+      filter: FixedSetFilterComponent,
+      filterParams: { values: ['転倒', '浮遊', 'ＫＢ', 'なし', 'ｶｳﾝﾀｰ', 'ALL', '召喚'] },
+      sortable: true,
+    },
   ];
 
   constructor(
