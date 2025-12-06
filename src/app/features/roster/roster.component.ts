@@ -12,7 +12,10 @@ import { General, UnitState } from '@models/general.model';
 import { Weapon } from '@models/weapon.model';
 import { Rules } from '@models/rules.model';
 import { HaveBooleanFilterComponent } from './have-boolean-filter.component';
-import { FixedSetFilterComponent } from './fixed-set-filter.component';
+// プリセット（表示名→gX）の定義を別ファイルで一元管理
+import { presetKeyMap, presetList as PRESET_LIST } from './config/presets';
+// 固定選択肢フィルタ（Community対応）を filters 配下へ配置
+import { FixedSetFilterComponent } from './filters/fixed-set-filter.component';
 
 type RosterRow = General & UnitState & {
   equipName?: string;
@@ -23,52 +26,9 @@ type RosterRow = General & UnitState & {
 @Component({
   selector: 'app-roster',
   standalone: true,
+  // AG Grid のカスタムフィルタはテンプレ外利用でも imports に登録が必要
   imports: [CommonModule, AgGridAngular, HaveBooleanFilterComponent, FixedSetFilterComponent],
-  template: `
-  <div class="relative pt-9">
-    <div class="absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-2 py-1.5 bg-white/90 backdrop-blur-sm">
-      <button
-        type="button"
-        (click)="toggleCompact()"
-        class="inline-flex items-center justify-center h-6 px-2.5 py-0.5 text-xs rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:translate-y-[1px]"
-        style="margin-left: 0;"
-      >
-        {{ compactOnly() ? '全表示' : '簡易表示' }}
-      </button>
-      <div class="flex gap-1.5 overflow-x-auto whitespace-nowrap">
-        <button
-          *ngFor="let p of presetList"
-          type="button"
-          [attr.aria-pressed]="activePreset === p"
-          (click)="applyPreset(p)"
-          [ngClass]="[
-            'inline-flex items-center justify-center h-6 px-2.5 py-0.5 text-xs rounded-full border shadow-sm transition',
-            'focus:outline-none focus:ring-2 focus:ring-blue-400/50',
-            activePreset === p
-              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-          ]"
-        >
-          {{ p }}
-        </button>
-      </div>
-      <span *ngIf="error()" class="ml-auto text-red-600 text-xs">エラー: {{ error() }}</span>
-    </div>
-    <ag-grid-angular
-      class="ag-theme-quartz ag-scope-roster"
-      style="width: 100%; height: 80vh;"
-      [rowData]="rows()"
-      [columnDefs]="columnDefs"
-      [defaultColDef]="defaultColDef"
-      [localeText]="localeJA"
-      [getRowId]="getRowId"
-      [suppressScrollOnNewData]="true"
-      (gridReady)="onGridReady($event)"
-      (cellValueChanged)="onCellValueChanged($event)"
-    />
-  </div>
-  `,
-  styles: [],
+  templateUrl: './roster.component.html',
 })
 export class RosterComponent implements OnInit {
   // 画面に表示する行データ（signal でリアクティブに更新）
@@ -87,25 +47,10 @@ export class RosterComponent implements OnInit {
   // （外部フィルタは撤去。AG Grid内蔵フィルタに一本化）
   // 追加: プリセット用
   private allRows: RosterRow[] = [];
-  activePreset: '地上' | '富甲' | '龍吟' | '孫劉' | '火鳳' | '龍舞' | '五虎' | '智掌' | 'ｼﾘｳｽ' | 'ﾓﾔﾓﾔ' | '君臨' | '傾城' | '北玄' | null = null;
-  // プリセット名 → General のキー
-  private readonly presetKeyMap = {
-    '地上': 'g1',
-    '五虎': 'g2',
-    '龍舞': 'g3',
-    '火鳳': 'g4',
-    '孫劉': 'g5',
-    '龍吟': 'g6',
-    '富甲': 'g7',
-    '智掌': 'g8',
-    'ｼﾘｳｽ': 'g9',
-    'ﾓﾔﾓﾔ': 'g10',
-    '君臨': 'g11',
-    '傾城': 'g12',
-    '北玄': 'g13',
- } as const;
- // プリセット一覧（表示順は presetKeyMap の定義順）
- presetList = Object.keys(this.presetKeyMap) as Array<keyof typeof this.presetKeyMap>;
+  // ボタンの現在選択（null で未選択＝全件表示）
+  activePreset: (keyof typeof presetKeyMap) | null = null;
+  // プリセットの表示順（config 定義）
+  presetList = PRESET_LIST;
  
   // 全列に共通の設定（サイズ変更・ソート・フィルタなど）
   defaultColDef: ColDef<RosterRow> = {
@@ -346,7 +291,7 @@ export class RosterComponent implements OnInit {
   // 要は、activePreset に設定されているプリセットの武将のみを表示する
   private applyPresetFilter(source: RosterRow[]): RosterRow[] {
     if (!this.activePreset) return source;
-    const key = this.presetKeyMap[this.activePreset];
+    const key = presetKeyMap[this.activePreset];
     return source.filter(r => !!(r as any)[key]);
   }
 
